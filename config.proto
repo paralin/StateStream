@@ -6,6 +6,8 @@ message Config {
 }
 
 message RateConfig {
+  // Minimum time between keyframes in nanoseconds
   double keyframe_frequency = 1;
+  // Minimum time between mutations in nanoseconds
   double change_frequency = 2;
 }
