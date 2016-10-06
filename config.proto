@@ -1,0 +1,11 @@
+syntax = "proto3";
+package stream;
+
+message Config {
+  RateConfig record_rate = 1;
+}
+
+message RateConfig {
+  double keyframe_frequency = 1;
+  double change_frequency = 2;
+}

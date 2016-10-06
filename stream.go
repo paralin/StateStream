@@ -63,7 +63,7 @@ func (c *Stream) WriteState(timestamp time.Time, state StateData) error {
 	if err != nil {
 		return err
 	}
-	return cursor.WriteState(timestamp, state, &c.config.RecordRate)
+	return cursor.WriteState(timestamp, state, c.config.RecordRate)
 }
 
 // Build a new cursor
