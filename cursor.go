@@ -39,7 +39,8 @@ type Cursor struct {
 	// Last snapshot before current timestamp
 	lastSnapshot *StreamEntry
 
-	forceSnapshotCheck bool
+	// Optimization: remember if we have a next snapshot.
+	nextSnapshot *StreamEntry
 
 	// Computed state at current timestamp
 	computedState *StateDataPtr
@@ -58,6 +59,9 @@ type Cursor struct {
 
 	// Last state before lastMutation
 	lastState *StateDataPtr
+
+	// Possibly known rate config
+	rateConfig *RateConfig
 }
 
 func newCursor(storage StorageBackend, cursorType CursorType) *Cursor {
@@ -81,6 +85,15 @@ func (c *Cursor) Init(timestamp time.Time) error {
 		c.SetTimestamp(timestamp)
 	}
 	return c.ComputeState()
+}
+
+// The cursor can do some internal optimizations if it knows the rate config.
+func (c *Cursor) SetRateConfig(config *RateConfig) {
+	if config.Validate() == nil {
+		c.rateConfig = config
+	} else {
+		c.rateConfig = nil
+	}
 }
 
 // Get the computed state
@@ -112,7 +125,6 @@ func (c *Cursor) SetTimestamp(timestamp time.Time) {
 		if c.lastSnapshot.Timestamp.After(timestamp) {
 			// force a recomputation of snapshot + state
 			c.lastSnapshot = nil
-			c.forceSnapshotCheck = true
 			c.lastMutations = make([]*StreamEntry, 0)
 			c.computedState = nil
 		}
@@ -126,9 +138,6 @@ func (c *Cursor) SetTimestamp(timestamp time.Time) {
 			if c.cursorType == ReadForwardCursor {
 				c.computedState = nil
 			}
-		} else {
-			// if we're fast forwarding, clear the snapshot in case there's a new one
-			c.forceSnapshotCheck = true
 		}
 		// It should be fine to feed forward in any case
 	}
@@ -186,6 +195,36 @@ func (c *Cursor) fillLastSnapshot() error {
 	return nil
 }
 
+func (c *Cursor) fillNextSnapshot() error {
+	// If we don't have a last snapshot, we can't have a next one.
+	if c.lastSnapshot == nil {
+		c.nextSnapshot = nil
+		return nil
+	}
+
+	// If the expected next snapshot is after now, we *shouldn't* have a next one.
+	// If the span of time was configured differently, we might.
+	// This is still fine as NextEntry will return it.
+	if c.rateConfig != nil {
+		expectedNext := c.lastSnapshot.Timestamp.Add(time.Duration(c.rateConfig.KeyframeFrequency) * time.Millisecond)
+		if expectedNext.After(time.Now()) {
+			c.nextSnapshot = nil
+			return nil
+		}
+	}
+
+	// Do the db hit
+	snap, err := c.storage.GetEntryAfter(c.lastSnapshot.Timestamp, StreamEntrySnapshot)
+	if err != nil {
+		return err
+	}
+	if snap != nil && snap.Type != StreamEntrySnapshot {
+		return errors.New("Storage backend returned the wrong entry type.")
+	}
+	c.nextSnapshot = snap
+	return nil
+}
+
 // Rewinds the state
 // Assumptions:
 //  - this is a rewindable cursor
@@ -206,6 +245,9 @@ func (c *Cursor) rewindState() (err error) {
 
 	idx := len(c.lastMutations) - 1
 	defer func() {
+		if len(c.lastMutations) == 0 {
+			return
+		}
 		if idx < 0 {
 			c.lastMutations = make([]*StreamEntry, 0)
 		} else {
@@ -292,24 +334,35 @@ func (c *Cursor) fastForwardState() (err error) {
 	}()
 
 	for c.computedTimestamp.Before(c.timestamp) {
-		mutation, err := c.storage.GetMutationAfter(c.computedTimestamp)
+		entry, err := c.storage.GetEntryAfter(c.computedTimestamp, StreamEntryAny)
 		if err != nil {
 			return err
 		}
-		if mutation == nil {
+		if entry == nil {
 			break
 		}
-		if mutation.Type != StreamEntryMutation {
-			return errors.New("Storage backend didn't return a valid mutation.")
+		if entry.Timestamp.Before(c.computedTimestamp) {
+			return errors.New("Storage backend returned an entry before requested time.")
 		}
-		if mutation.Timestamp.Before(c.computedTimestamp) {
-			return errors.New("Storage backend returned a mutation before requested time.")
-		}
-		if mutation.Timestamp.After(c.timestamp) {
+		if entry.Timestamp.After(c.timestamp) {
+			if entry.Type == StreamEntrySnapshot {
+				c.nextSnapshot = entry
+			}
 			break
 		}
-		if err := c.applyMutation(mutation); err != nil {
-			return err
+		if entry.Type == StreamEntryMutation {
+			if err := c.applyMutation(entry); err != nil {
+				return err
+			}
+		} else if entry.Type == StreamEntrySnapshot {
+			c.lastSnapshot = entry
+			c.nextSnapshot = nil
+			if err := c.copySnapshotState(); err != nil {
+				return err
+			}
+			if err := c.fillNextSnapshot(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -327,6 +380,7 @@ func (c *Cursor) copySnapshotState() error {
 	c.computedTimestamp = c.lastSnapshot.Timestamp
 	c.lastMutation = nil
 	c.lastState = postClone
+	c.lastMutations = []*StreamEntry{}
 	return nil
 }
 
@@ -475,13 +529,18 @@ func (c *Cursor) ComputeState() (computeErr error) {
 			c.computedTimestamp = c.timestamp
 			computeErr = nil
 			c.lastState = nil
+		} else {
+			c.ready = computeErr == nil
 		}
 		c.notReadyError = computeErr
 	}()
 
 	// Fill the last snapshot if needed
-	if c.lastSnapshot == nil || c.forceSnapshotCheck {
+	if c.lastSnapshot == nil {
 		if err := c.fillLastSnapshot(); err != nil {
+			return err
+		}
+		if err := c.fillNextSnapshot(); err != nil {
 			return err
 		}
 	}
@@ -490,6 +549,7 @@ func (c *Cursor) ComputeState() (computeErr error) {
 
 	if c.timestamp.Equal(c.lastSnapshot.Timestamp) {
 		err = c.copySnapshotState()
+		c.nextSnapshot = nil
 	} else if c.computedState != nil {
 		// If we have a computed state, we can move it to the target state
 		// This is enforced in SetTimestamp()
@@ -499,6 +559,26 @@ func (c *Cursor) ComputeState() (computeErr error) {
 			err = c.rewindState()
 		} else {
 			// We need to fast-forward the cursor
+			// First fast forward the snapshot
+			if c.nextSnapshot != nil && c.nextSnapshot.Timestamp.Before(c.timestamp) {
+				c.lastSnapshot = c.nextSnapshot
+				c.nextSnapshot = nil
+				if err := c.fillNextSnapshot(); err != nil {
+					return err
+				}
+				// If the next snapshot is STILL before the timestamp
+				if c.nextSnapshot.Timestamp.Before(c.timestamp) {
+					// Fast forward
+					c.lastSnapshot = nil
+					c.nextSnapshot = nil
+					if err := c.fillLastSnapshot(); err != nil {
+						return err
+					}
+					if err := c.fillNextSnapshot(); err != nil {
+						return err
+					}
+				}
+			}
 			err = c.fastForwardState()
 		}
 	} else {
@@ -510,6 +590,5 @@ func (c *Cursor) ComputeState() (computeErr error) {
 		}
 	}
 
-	c.ready = err == nil
 	return err
 }

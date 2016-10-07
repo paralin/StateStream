@@ -25,12 +25,12 @@ func (sb *MockStorageBackend) GetSnapshotBefore(timestamp time.Time) (*StreamEnt
 	return nil, nil
 }
 
-func (sb *MockStorageBackend) GetMutationAfter(timestamp time.Time) (*StreamEntry, error) {
+func (sb *MockStorageBackend) GetEntryAfter(timestamp time.Time, filterType StreamEntryType) (*StreamEntry, error) {
 	for _, entry := range sb.Entries {
 		if !entry.Timestamp.After(timestamp) {
 			continue
 		}
-		if entry.Type == StreamEntryMutation {
+		if filterType == StreamEntryAny || filterType == entry.Type {
 			return entry, nil
 		}
 	}
@@ -285,7 +285,7 @@ func TestRewindStateSimple(t *testing.T) {
 	}
 	cursor.computedState.StateData["test"] = "latest"
 	cursor.lastSnapshot.Data["test"] = "veryold"
-	cursor.lastMutations = make([]*StreamEntry, 5)
+	cursor.lastMutations = make([]*StreamEntry, 6)
 
 	makeEntry := func(secs int) *StreamEntry {
 		return &StreamEntry{
@@ -298,13 +298,14 @@ func TestRewindStateSimple(t *testing.T) {
 	// We rewind to 2.5 seconds after snapshot
 	// We have a mutation at 1 second, 2 second after snapshot
 	// -> we should have 2 mutations afterward
-	cursor.lastMutations[0] = makeEntry(1)
-	cursor.lastMutations[0].Data["test"] = "not expected"
-	cursor.lastMutations[1] = makeEntry(2)
-	cursor.lastMutations[2] = makeEntry(3)
-	cursor.lastMutations[3] = makeEntry(4)
-	cursor.lastMutations[3].Data["test"] = "expected"
-	cursor.lastMutations[4] = makeEntry(5)
+	cursor.lastMutations[0] = cursor.lastSnapshot
+	cursor.lastMutations[1] = makeEntry(1)
+	cursor.lastMutations[1].Data["test"] = "not expected"
+	cursor.lastMutations[2] = makeEntry(2)
+	cursor.lastMutations[3] = makeEntry(3)
+	cursor.lastMutations[4] = makeEntry(4)
+	cursor.lastMutations[4].Data["test"] = "expected"
+	cursor.lastMutations[5] = makeEntry(5)
 
 	cursor.SetTimestamp(now.Add(-time.Duration(7500) * time.Millisecond))
 	if err := cursor.ComputeState(); err != nil {
@@ -320,8 +321,25 @@ func TestRewindStateSimple(t *testing.T) {
 	if err == nil && (data["test"] != "expected") {
 		err = errors.New("Cursor did not rewind properly - incorrect data.")
 	}
-	if err == nil && len(cursor.lastMutations) != 2 {
+	if err == nil && len(cursor.lastMutations) != 3 {
 		err = errors.New("Cursor did not clear lastMutations properly.")
+	}
+	if err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+
+	cursor.SetTimestamp(snapshotTime)
+	if err := cursor.ComputeState(); err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+	data, err = cursor.State()
+	if err == nil {
+		err = CheckValidComputation(cursor)
+	}
+	if err == nil && (data["test"] != "veryold") {
+		err = errors.New("Cursor did not rewind properly - incorrect data.")
 	}
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -372,7 +390,6 @@ func TestFastForwardStateSimple(t *testing.T) {
 
 	// Fast forward to before unexpected
 	cursor.SetTimestamp(snapshotTime.Add(time.Duration(2) * time.Second))
-	_ = "breakpoint"
 	if err := cursor.ComputeState(); err != nil {
 		t.Fatalf(err.Error())
 		t.Fail()
@@ -384,6 +401,77 @@ func TestFastForwardStateSimple(t *testing.T) {
 		err = CheckValidComputation(cursor)
 	}
 	if err == nil && (data["test"] != "expected") {
+		err = errors.New("Cursor did not fast forward properly - incorrect data.")
+	}
+	if err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+}
+
+func TestFastForwardStateMultiSnapshot(t *testing.T) {
+	snapshotTime := time.Now().Add(-time.Duration(10) * time.Second)
+	storageMock := &MockStorageBackend{Entries: make([]*StreamEntry, 6)}
+	cursor := &Cursor{
+		storage:      storageMock,
+		cursorType:   ReadForwardCursor,
+		computeMutex: sync.Mutex{},
+	}
+	makeEntry := func(secs int) *StreamEntry {
+		return &StreamEntry{
+			Type:      StreamEntryMutation,
+			Timestamp: snapshotTime.Add(time.Duration(secs) * time.Second),
+			Data:      NewStateData().StateData,
+		}
+	}
+
+	storageMock.Entries[0] = makeEntry(0)
+	storageMock.Entries[0].Type = StreamEntrySnapshot
+	storageMock.Entries[0].Data["test"] = "veryold"
+	storageMock.Entries[1] = makeEntry(2)
+	storageMock.Entries[1].Data["test"] = "one"
+	storageMock.Entries[2] = makeEntry(3)
+	storageMock.Entries[2].Data["test"] = "two"
+	storageMock.Entries[2].Type = StreamEntrySnapshot
+	storageMock.Entries[3] = makeEntry(4)
+	storageMock.Entries[3].Data["test"] = "three"
+	storageMock.Entries[4] = makeEntry(5)
+	storageMock.Entries[4].Data["test"] = "four"
+	storageMock.Entries[4].Type = StreamEntrySnapshot
+	storageMock.Entries[5] = makeEntry(6)
+	storageMock.Entries[5].Data["test"] = "five"
+
+	err := cursor.Init(snapshotTime.Add(time.Millisecond * time.Duration(10)))
+
+	data, err := cursor.State()
+	if err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+
+	if err == nil {
+		err = CheckValidComputation(cursor)
+	}
+	if err == nil && (data["test"] != "veryold") {
+		err = errors.New("Cursor did not init properly - incorrect data.")
+	}
+	if err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+
+	// Fast forward to after the end
+	cursor.SetTimestamp(snapshotTime.Add(time.Duration(10) * time.Second))
+	if err := cursor.ComputeState(); err != nil {
+		t.Fatalf(err.Error())
+		t.Fail()
+	}
+
+	data, err = cursor.State()
+	if err == nil {
+		err = CheckValidComputation(cursor)
+	}
+	if err == nil && (data["test"] != "five") {
 		err = errors.New("Cursor did not fast forward properly - incorrect data.")
 	}
 	if err != nil {

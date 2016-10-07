@@ -13,6 +13,8 @@ type StreamEntryType int
 const (
 	StreamEntrySnapshot StreamEntryType = iota
 	StreamEntryMutation
+	// used when filtering stream entries
+	StreamEntryAny
 )
 
 // An entry in the stream.

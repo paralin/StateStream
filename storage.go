@@ -8,8 +8,9 @@ import (
 type StorageBackend interface {
 	// Retrieve the first snapshot before timestamp. Return nil for no data.
 	GetSnapshotBefore(timestamp time.Time) (*StreamEntry, error)
-	// Retrieve the first mutation after timestamp. Return nil for no data.
-	GetMutationAfter(timestamp time.Time) (*StreamEntry, error)
+	// Get the next entry after the timestamp. Return nil for no data.
+	// Filter by the filter type, or don't filter if StreamEntryAny
+	GetEntryAfter(timestamp time.Time, filterType StreamEntryType) (*StreamEntry, error)
 	// Store a stream entry.
 	SaveEntry(entry *StreamEntry) error
 	// Amend an old entry
