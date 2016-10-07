@@ -379,7 +379,7 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 	}
 
 	// If the last thing that changed was a mutation and it's too soon to make a new mutation
-	if c.lastMutation != nil && timestamp.Sub(c.lastMutation.Timestamp) < time.Duration(config.ChangeFrequency) {
+	if c.lastMutation != nil && timestamp.Sub(c.lastMutation.Timestamp) < (time.Duration(config.ChangeFrequency)*time.Millisecond) {
 		amendedMutation := &StreamEntry{
 			Type:      StreamEntryMutation,
 			Timestamp: c.lastMutation.Timestamp,
@@ -399,7 +399,7 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 	}
 
 	// Check if we should make a new snapshot
-	if c.lastState == nil || timestamp.Sub(c.lastSnapshot.Timestamp) >= time.Duration(config.KeyframeFrequency) {
+	if c.lastState == nil || timestamp.Sub(c.lastSnapshot.Timestamp) >= (time.Duration(config.KeyframeFrequency)*time.Millisecond) {
 		// Make a new snapshot
 		snapshot := &StreamEntry{
 			Type:      StreamEntrySnapshot,
