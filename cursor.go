@@ -133,6 +133,11 @@ func (c *Cursor) Timestamp() time.Time {
 	return c.timestamp
 }
 
+// Actual timestamp of state
+func (c *Cursor) ComputedTimestamp() time.Time {
+	return c.computedTimestamp
+}
+
 // Getter for cursor type
 func (c *Cursor) GetCursorType() CursorType {
 	return c.cursorType
@@ -184,9 +189,9 @@ func (c *Cursor) rewindState() (err error) {
 		// If we failed, we probably messed up the computed state
 		if err != nil {
 			c.computedState = nil
-		} else {
-			c.computedTimestamp = c.timestamp
-		}
+		} // else {
+		//	c.computedTimestamp = c.timestamp
+		//}
 	}()
 
 	idx := len(c.lastMutations) - 1
@@ -271,9 +276,9 @@ func (c *Cursor) fastForwardState() (err error) {
 	defer func() {
 		if err != nil {
 			c.computedState = nil
-		} else {
-			c.computedTimestamp = c.timestamp
-		}
+		} // else {
+		//	c.computedTimestamp = c.timestamp
+		//}
 	}()
 
 	for c.computedTimestamp.Before(c.timestamp) {
