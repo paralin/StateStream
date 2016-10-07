@@ -336,11 +336,10 @@ func TestFastForwardStateSimple(t *testing.T) {
 	// target timestamp is at snapshot + 2.5 second
 	now := time.Now()
 	snapshotTime := now.Add(-time.Duration(10) * time.Second)
-	storageMock := &MockStorageBackend{Entries: make([]*StreamEntry, 2)}
+	storageMock := &MockStorageBackend{Entries: make([]*StreamEntry, 4)}
 	cursor := &Cursor{
 		storage:           storageMock,
 		cursorType:        ReadForwardCursor,
-		ready:             true,
 		computeMutex:      sync.Mutex{},
 		timestamp:         snapshotTime,
 		computedTimestamp: snapshotTime,
@@ -362,13 +361,18 @@ func TestFastForwardStateSimple(t *testing.T) {
 		}
 	}
 
-	storageMock.Entries[0] = makeEntry(1)
-	storageMock.Entries[0].Data["test"] = "expected"
-	storageMock.Entries[1] = makeEntry(4)
-	storageMock.Entries[1].Data["test"] = "unexpected"
+	storageMock.Entries[0] = cursor.lastSnapshot
+	storageMock.Entries[1] = makeEntry(1)
+	storageMock.Entries[1].Data["test"] = "expected"
+	storageMock.Entries[2] = makeEntry(4)
+	storageMock.Entries[2].Data["test"] = "unexpected"
+	storageMock.Entries[3] = makeEntry(5)
+	storageMock.Entries[3].Data["test"] = "veryunexpected"
+	storageMock.Entries[3].Type = StreamEntrySnapshot
 
 	// Fast forward to before unexpected
 	cursor.SetTimestamp(snapshotTime.Add(time.Duration(2) * time.Second))
+	_ = "breakpoint"
 	if err := cursor.ComputeState(); err != nil {
 		t.Fatalf(err.Error())
 		t.Fail()

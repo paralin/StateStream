@@ -39,6 +39,8 @@ type Cursor struct {
 	// Last snapshot before current timestamp
 	lastSnapshot *StreamEntry
 
+	forceSnapshotCheck bool
+
 	// Computed state at current timestamp
 	computedState *StateDataPtr
 
@@ -110,6 +112,7 @@ func (c *Cursor) SetTimestamp(timestamp time.Time) {
 		if c.lastSnapshot.Timestamp.After(timestamp) {
 			// force a recomputation of snapshot + state
 			c.lastSnapshot = nil
+			c.forceSnapshotCheck = true
 			c.lastMutations = make([]*StreamEntry, 0)
 			c.computedState = nil
 		}
@@ -123,6 +126,9 @@ func (c *Cursor) SetTimestamp(timestamp time.Time) {
 			if c.cursorType == ReadForwardCursor {
 				c.computedState = nil
 			}
+		} else {
+			// if we're fast forwarding, clear the snapshot in case there's a new one
+			c.forceSnapshotCheck = true
 		}
 		// It should be fine to feed forward in any case
 	}
@@ -157,8 +163,6 @@ func (c *Cursor) Ready() bool {
 
 // Finds the last snapshot field.
 func (c *Cursor) fillLastSnapshot() error {
-	// clear last mutations
-	c.lastMutations = make([]*StreamEntry, 0)
 	data, err := c.storage.GetSnapshotBefore(c.timestamp)
 	if err != nil {
 		return err
@@ -173,6 +177,12 @@ func (c *Cursor) fillLastSnapshot() error {
 		return errors.New("Storage backend returned a snapshot after the requested timestamp.")
 	}
 	c.lastSnapshot = data
+	if c.lastSnapshot != nil && data.Timestamp.Equal(c.lastSnapshot.Timestamp) {
+		// don't clear mutations, we're using the last one again
+		return nil
+	}
+	c.lastMutations = make([]*StreamEntry, 0)
+	c.computedState = nil
 	return nil
 }
 
@@ -470,8 +480,7 @@ func (c *Cursor) ComputeState() (computeErr error) {
 	}()
 
 	// Fill the last snapshot if needed
-	if c.lastSnapshot == nil {
-		c.computedState = nil
+	if c.lastSnapshot == nil || c.forceSnapshotCheck {
 		if err := c.fillLastSnapshot(); err != nil {
 			return err
 		}
