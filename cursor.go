@@ -449,6 +449,13 @@ func (c *Cursor) HandleEntry(entry *StreamEntry) error {
 }
 
 func (c *Cursor) WriteEntry(entry *StreamEntry, config *RateConfig) (writeError error) {
+	defer func() {
+		if writeError != nil {
+			for _, ch := range c.entrySubscriptions {
+				ch <- entry
+			}
+		}
+	}()
 	if entry.Type == StreamEntrySnapshot {
 		return c.WriteState(entry.Timestamp, entry.Data, config)
 	}
