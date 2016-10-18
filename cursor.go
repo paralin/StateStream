@@ -62,15 +62,24 @@ type Cursor struct {
 
 	// Possibly known rate config
 	rateConfig *RateConfig
+
+	// For a feed-forward cursor, subscribe to a stream of entries when fast-forwarding
+	// This is useful to get all entries between two points, e.x.:
+	// cursor.Init(oldTime); sub := cursor.WatchEntries(func(entry *StreamEntry){}); cursor.SetTimestamp(newTime); cursor.Compute(); sub.Unsubscribe()
+	entrySubscriptions map[int]chan<- *StreamEntry
+
+	// Running nonce for subscription IDs
+	entrySubscriptionsNonce int
 }
 
 func newCursor(storage StorageBackend, cursorType CursorType) *Cursor {
 	return &Cursor{
-		storage:       storage,
-		cursorType:    cursorType,
-		computeMutex:  sync.Mutex{},
-		ready:         false,
-		lastMutations: make([]*StreamEntry, 0),
+		storage:            storage,
+		cursorType:         cursorType,
+		computeMutex:       sync.Mutex{},
+		entrySubscriptions: make(map[int]chan<- *StreamEntry),
+		ready:              false,
+		lastMutations:      make([]*StreamEntry, 0),
 	}
 }
 
@@ -104,6 +113,22 @@ func (c *Cursor) State() (StateData, error) {
 		return nil, errors.New("Computation is not ready.")
 	}
 	return c.computedState.StateData, nil
+}
+
+func (c *Cursor) SubscribeEntries(ch chan<- *StreamEntry) *cursorEntrySubscription {
+	c.computeMutex.Lock()
+	defer c.computeMutex.Unlock()
+
+	nonce := c.entrySubscriptionsNonce
+	c.entrySubscriptionsNonce++
+	c.entrySubscriptions[nonce] = ch
+	return &cursorEntrySubscription{
+		unsubFunc: func() {
+			c.computeMutex.Lock()
+			defer c.computeMutex.Unlock()
+			delete(c.entrySubscriptions, nonce)
+		},
+	}
 }
 
 func (c *Cursor) SetTimestamp(timestamp time.Time) {
@@ -350,6 +375,9 @@ func (c *Cursor) fastForwardState() (err error) {
 			}
 			break
 		}
+		for _, cb := range c.entrySubscriptions {
+			cb <- entry
+		}
 		if entry.Type == StreamEntryMutation {
 			if err := c.applyMutation(entry); err != nil {
 				return err
@@ -584,8 +612,8 @@ func (c *Cursor) ComputeState() (computeErr error) {
 			err = c.rewindState()
 		} else {
 			// We need to fast-forward the cursor
-			// First fast forward the snapshot
-			if c.nextSnapshot != nil && c.nextSnapshot.Timestamp.Before(c.timestamp) {
+			// First fast forward the snapshot, IF we have no entry subscriptions.
+			if len(c.entrySubscriptions) == 0 && c.nextSnapshot != nil && c.nextSnapshot.Timestamp.Before(c.timestamp) {
 				c.lastSnapshot = c.nextSnapshot
 				c.nextSnapshot = nil
 				if err := c.fillNextSnapshot(); err != nil {

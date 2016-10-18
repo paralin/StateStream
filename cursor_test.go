@@ -1,6 +1,7 @@
 package stream
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -112,7 +113,7 @@ func TestSimpleBidirectionalCursor(t *testing.T) {
 	now := time.Now()
 	storageMock := &MockStorageBackend{
 		Entries: []*StreamEntry{
-			&StreamEntry{
+			{
 				Type:      StreamEntrySnapshot,
 				Timestamp: now.Add(-time.Duration(5) * time.Second),
 				Data: map[string]interface{}{
@@ -121,7 +122,7 @@ func TestSimpleBidirectionalCursor(t *testing.T) {
 					},
 				},
 			},
-			&StreamEntry{
+			{
 				Type:      StreamEntryMutation,
 				Timestamp: now,
 				Data: map[string]interface{}{
@@ -368,6 +369,7 @@ func TestFastForwardStateSimple(t *testing.T) {
 			Data:      NewStateData().StateData,
 		},
 	}
+	cursor.entrySubscriptions = make(map[int]chan<- *StreamEntry)
 	cursor.computedState.StateData["test"] = "veryold"
 	cursor.lastSnapshot.Data["test"] = "veryold"
 
@@ -388,12 +390,18 @@ func TestFastForwardStateSimple(t *testing.T) {
 	storageMock.Entries[3].Data["test"] = "veryunexpected"
 	storageMock.Entries[3].Type = StreamEntrySnapshot
 
+	// Subscribe to changes
+	ch := make(chan *StreamEntry, 100)
+	sub := cursor.SubscribeEntries(ch)
+
 	// Fast forward to before unexpected
 	cursor.SetTimestamp(snapshotTime.Add(time.Duration(2) * time.Second))
 	if err := cursor.ComputeState(); err != nil {
 		t.Fatalf(err.Error())
 		t.Fail()
 	}
+
+	sub.Unsubscribe()
 
 	var err error
 	data, err := cursor.State()
@@ -402,6 +410,20 @@ func TestFastForwardStateSimple(t *testing.T) {
 	}
 	if err == nil && (data["test"] != "expected") {
 		err = errors.New("Cursor did not fast forward properly - incorrect data.")
+	}
+	if err == nil && len(ch) != 1 {
+		err = errors.New("Cursor did not emit entries properly - incorrect number of emitted entries.")
+		t.Log("Cursor emit entries:")
+	OuterLoop:
+		for {
+			select {
+			case entry := <-ch:
+				d, _ := json.Marshal(entry)
+				t.Logf(" -> %s", string(d))
+			default:
+				break OuterLoop
+			}
+		}
 	}
 	if err != nil {
 		t.Fatalf(err.Error())
