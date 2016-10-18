@@ -14,6 +14,13 @@ func TestSimpleStreamWrite(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
+	cursor, err := stream.WriteCursor()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	ch := make(chan *StreamEntry, 100)
+	sub := cursor.SubscribeEntries(ch)
+
 	now := time.Now()
 	if err := CheckWriteState(stream, `{"test":1}`, now); err != nil {
 		t.Fatalf(err.Error())
@@ -37,6 +44,8 @@ func TestSimpleStreamWrite(t *testing.T) {
 		t.Fatalf("Did not store in storage correctly.")
 	}
 
+	sub.Unsubscribe()
+
 	// Go 120 second later (should make new snapshot)
 	now = now.Add(time.Second * time.Duration(120))
 	if err := CheckWriteState(stream, `{"test":3, "test2": 4, "test3": 5}`, now); err != nil {
@@ -44,6 +53,10 @@ func TestSimpleStreamWrite(t *testing.T) {
 	}
 	if len(storageMock.Entries) != 3 || storageMock.Entries[2].Type != StreamEntrySnapshot {
 		t.Fatalf("Did not store in storage correctly.")
+	}
+
+	if len(ch) != 3 {
+		t.Fatalf("Subscribing to write cursor had %d != 3 entries.", len(ch))
 	}
 }
 

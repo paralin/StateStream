@@ -449,13 +449,6 @@ func (c *Cursor) HandleEntry(entry *StreamEntry) error {
 }
 
 func (c *Cursor) WriteEntry(entry *StreamEntry, config *RateConfig) (writeError error) {
-	defer func() {
-		if writeError != nil {
-			for _, ch := range c.entrySubscriptions {
-				ch <- entry
-			}
-		}
-	}()
 	if entry.Type == StreamEntrySnapshot {
 		return c.WriteState(entry.Timestamp, entry.Data, config)
 	}
@@ -483,6 +476,14 @@ func (c *Cursor) WriteEntry(entry *StreamEntry, config *RateConfig) (writeError 
 // Writes a state to the end of the stream.
 func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateConfig) (writeError error) {
 	c.computeMutex.Lock()
+	var savedEntry *StreamEntry
+	defer func() {
+		if writeError == nil && savedEntry != nil {
+			for _, ch := range c.entrySubscriptions {
+				ch <- savedEntry
+			}
+		}
+	}()
 	defer c.computeMutex.Unlock()
 
 	if c.lastState != nil && reflect.DeepEqual(c.lastState.StateData, state) {
@@ -514,6 +515,18 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 			Timestamp: c.lastMutation.Timestamp,
 		}
 
+		// Calculate a mutation from lastMutation to the new state.
+		if c.lastState != nil && len(c.entrySubscriptions) > 0 {
+			savedEntry = &StreamEntry{
+				Type:      StreamEntryMutation,
+				Timestamp: timestamp,
+			}
+			dupedLastState, err := c.lastState.Clone()
+			if err == nil {
+				savedEntry.Data = mutate.BuildMutation(dupedLastState.StateData, inputState.StateData)
+			}
+		}
+
 		// Calculate the new mutation
 		amendedMutation.Data = mutate.BuildMutation(c.lastState.StateData, inputState.StateData)
 		if err := c.storage.AmendEntry(amendedMutation, c.lastMutation.Timestamp); err != nil {
@@ -536,6 +549,7 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 			Timestamp: timestamp,
 		}
 
+		savedEntry = snapshot
 		if err := c.storage.SaveEntry(snapshot); err != nil {
 			return err
 		}
@@ -562,6 +576,7 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 		Data:      mutate.BuildMutation(c.lastState.StateData, inputState.StateData),
 	}
 
+	savedEntry = newMutationEntry
 	if err := c.storage.SaveEntry(newMutationEntry); err != nil {
 		return err
 	}
