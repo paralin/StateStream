@@ -66,6 +66,14 @@ func (c *Stream) WriteState(timestamp time.Time, state StateData) error {
 	return cursor.WriteState(timestamp, state, c.config.RecordRate)
 }
 
+func (c *Stream) WriteEntry(entry *StreamEntry) error {
+	cursor, err := c.WriteCursor()
+	if err != nil {
+		return err
+	}
+	return cursor.WriteEntry(entry, c.config.RecordRate)
+}
+
 // Build a new cursor
 func (s *Stream) BuildCursor(cursorType CursorType) *Cursor {
 	return newCursor(s.storage, cursorType)

@@ -19,9 +19,9 @@ const (
 
 // An entry in the stream.
 type StreamEntry struct {
-	Timestamp time.Time
-	Type      StreamEntryType
-	Data      StateData
+	Timestamp time.Time       `json:"timestamp"`
+	Type      StreamEntryType `json:"type"`
+	Data      StateData       `json:"data"`
 }
 
 type StateDataPtr struct {

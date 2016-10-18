@@ -420,6 +420,31 @@ func (c *Cursor) HandleEntry(entry *StreamEntry) error {
 	}
 }
 
+func (c *Cursor) WriteEntry(entry *StreamEntry, config *RateConfig) (writeError error) {
+	if entry.Type == StreamEntrySnapshot {
+		return c.WriteState(entry.Timestamp, entry.Data, config)
+	}
+
+	// Apply the mutation
+	sd, err := c.State()
+	if err != nil {
+		return err
+	}
+
+	sdp := &StateDataPtr{StateData: sd}
+	sdp, err = sdp.Clone()
+	if err != nil {
+		return err
+	}
+
+	nsd, err := mutate.ApplyMutationObject(sdp.StateData, entry.Data)
+	if err != nil {
+		return err
+	}
+
+	return c.WriteState(entry.Timestamp, nsd, config)
+}
+
 // Writes a state to the end of the stream.
 func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateConfig) (writeError error) {
 	c.computeMutex.Lock()
