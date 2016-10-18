@@ -96,6 +96,22 @@ func (c *Cursor) Init(timestamp time.Time) error {
 	return c.ComputeState()
 }
 
+func (c *Cursor) InitWithSnapshot(snap *StreamEntry) error {
+	if c.cursorType == WriteCursor {
+		return errors.New("Cannot initialize write cursors with snapshot.")
+	}
+
+	// bypass SetTimestamp limitations
+	c.ready = true
+	c.timestamp = snap.Timestamp
+	c.lastSnapshot = snap
+	if err := c.copySnapshotState(); err != nil {
+		return err
+	}
+	c.fillNextSnapshot()
+	return nil
+}
+
 // The cursor can do some internal optimizations if it knows the rate config.
 func (c *Cursor) SetRateConfig(config *RateConfig) {
 	if config.Validate() == nil {
