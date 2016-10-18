@@ -24,6 +24,9 @@ var NoDataError error = errors.New("No data for that timestamp.")
 type Cursor struct {
 	storage StorageBackend
 
+	// Has Init() been called?
+	inited bool
+
 	// Do we have a state calculated at the desired timestamp?
 	ready bool
 
@@ -86,6 +89,10 @@ func newCursor(storage StorageBackend, cursorType CursorType) *Cursor {
 // Initializes a cursor at a timestamp.
 // Timestamp is optional for a write cursor.
 func (c *Cursor) Init(timestamp time.Time) error {
+	if c.inited {
+		return errors.New("Do not call Init() twice.")
+	}
+	c.inited = true
 	if c.cursorType == WriteCursor {
 		// bypass SetTimestamp limitations
 		c.ready = false
@@ -131,7 +138,7 @@ func (c *Cursor) State() (StateData, error) {
 	return c.computedState.StateData, nil
 }
 
-func (c *Cursor) SubscribeEntries(ch chan<- *StreamEntry) *cursorEntrySubscription {
+func (c *Cursor) SubscribeEntries(ch chan<- *StreamEntry) CursorEntrySubscription {
 	c.computeMutex.Lock()
 	defer c.computeMutex.Unlock()
 

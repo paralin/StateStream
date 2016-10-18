@@ -1,5 +1,9 @@
 package stream
 
+type CursorEntrySubscription interface {
+	Unsubscribe()
+}
+
 type cursorEntrySubscription struct {
 	unsubFunc func()
 }
