@@ -43,6 +43,15 @@ func (s *Stream) ResetWriter() {
 	s.writeCursor = nil
 }
 
+// Sets the minimum time between mutations to 0
+func (s *Stream) DisableAmends() {
+	s.config.RecordRate.ChangeFrequency = 0
+	wc, _ := s.WriteCursor()
+	if wc != nil && wc.rateConfig != nil {
+		wc.rateConfig.ChangeFrequency = 0
+	}
+}
+
 // Initialize the stream for writing.
 // If not called, done automatically at the first write.
 func (s *Stream) InitWriter() error {
