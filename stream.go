@@ -21,11 +21,18 @@ func NewStream(storage StorageBackend, config *Config) (*Stream, error) {
 	if storage == nil {
 		return nil, errors.New("Storage must be defined.")
 	}
-	if config == nil {
+	if config == nil || config.RecordRate == nil {
 		config = DefaultStreamConfig()
 	}
 
 	return &Stream{config: *config, storage: storage}, nil
+}
+
+// Reset writer to force a db hit.
+func (s *Stream) ResetWriter() {
+	s.initLock.Lock()
+	defer s.initLock.Unlock()
+	s.writeCursor = nil
 }
 
 // Initialize the stream for writing.

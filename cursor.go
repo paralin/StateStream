@@ -198,6 +198,7 @@ func (c *Cursor) Timestamp() time.Time {
 
 // Actual timestamp of state
 func (c *Cursor) ComputedTimestamp() time.Time {
+	// DO NOT LOCK
 	return c.computedTimestamp
 }
 
@@ -420,6 +421,13 @@ func (c *Cursor) fastForwardState() (err error) {
 	return nil
 }
 
+// Make sure no computation or write happens during func call
+func (c *Cursor) WriteGuard(cb func() error) error {
+	c.computeMutex.Lock()
+	defer c.computeMutex.Unlock()
+	return cb()
+}
+
 // Copies snapshot state to current state
 func (c *Cursor) copySnapshotState() error {
 	preClone := &StateDataPtr{StateData: c.lastSnapshot.Data}
@@ -455,14 +463,21 @@ func (c *Cursor) canHandleNewEntry(timestamp time.Time) error {
 }
 
 // Handle a state entry on a writer (keeps writer up to date)
-func (c *Cursor) HandleEntry(entry *StreamEntry) error {
+func (c *Cursor) HandleEntry(entry *StreamEntry) (handleError error) {
 	c.computeMutex.Lock()
+	defer func() {
+		if handleError != nil {
+			return
+		}
+		for _, cb := range c.entrySubscriptions {
+			cb <- entry
+		}
+	}()
 	defer c.computeMutex.Unlock()
 
 	if err := c.canHandleNewEntry(entry.Timestamp); err != nil {
 		return err
 	}
-
 	if entry.Type == StreamEntrySnapshot {
 		c.lastSnapshot = entry
 		return c.copySnapshotState()
@@ -502,6 +517,7 @@ func (c *Cursor) WriteState(timestamp time.Time, state StateData, config *RateCo
 	var savedEntry *StreamEntry
 	defer func() {
 		if writeError == nil && savedEntry != nil {
+			c.computedTimestamp = savedEntry.Timestamp
 			for _, ch := range c.entrySubscriptions {
 				ch <- savedEntry
 			}
