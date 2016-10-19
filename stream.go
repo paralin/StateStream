@@ -28,6 +28,10 @@ func NewStream(storage StorageBackend, config *Config) (*Stream, error) {
 	return &Stream{config: *config, storage: storage}, nil
 }
 
+func (s *Stream) GetConfig() Config {
+	return s.config
+}
+
 // Reset writer to force a db hit.
 func (s *Stream) ResetWriter() {
 	s.initLock.Lock()
