@@ -32,6 +32,10 @@ func (s *Stream) GetConfig() Config {
 	return s.config
 }
 
+func (s *Stream) GetStorage() StorageBackend {
+	return s.storage
+}
+
 // Reset writer to force a db hit.
 func (s *Stream) ResetWriter() {
 	s.initLock.Lock()
