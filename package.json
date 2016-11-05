@@ -1,0 +1,44 @@
+{
+  "name": "@fusebot/state-stream",
+  "version": "0.0.1",
+  "main": "js/lib/index.js",
+  "typings": "js/lib/index.d.ts",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "protobufjs": "^5.0.1"
+  },
+  "scripts": {
+    "lint": "cd js && tslint -c tslint.json --project tsconfig.json --type-check",
+    "build": "cd js && tsc",
+    "test": "npm run lint && npm run mocha",
+    "gen-proto": "./scripts/gen_proto.bash",
+    "ci": "npm run build && npm run test",
+    "mocha": "cd js && ts-node ../node_modules/istanbul/lib/cli.js cover -e .ts  -x \"*.d.ts\" -x \"*.spec.ts\" ../node_modules/jasmine/bin/jasmine.js -- JASMINE_CONFIG_PATH=jasmine.json",
+    "postpublish": "greenkeeper-postpublish",
+    "semantic-release": "semantic-release pre && npm publish && semantic-release post"
+  },
+  "devDependencies": {
+    "@types/jasmine": "^2.5.36",
+    "@types/protobufjs": "^5.0.31",
+    "babel-core": "^6.18.0",
+    "babel-preset-es2015": "^6.18.0",
+    "codelyzer": "0.0.28",
+    "cz-conventional-changelog": "^1.2.0",
+    "greenkeeper-postpublish": "^1.0.1",
+    "istanbul": "^1.1.0-alpha.1",
+    "jasmine": "^2.5.2",
+    "semantic-release": "^4.3.5",
+    "ts-node": "^1.6.1",
+    "tslint": "^3.14.0",
+    "typescript": "~2.0.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FuseRobotics/statestream.git"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}

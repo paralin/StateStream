@@ -1,0 +1,5 @@
+*.go
+*.out
+Makefile
+Jenkinsfile
+scripts/

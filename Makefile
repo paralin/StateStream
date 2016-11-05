@@ -1,4 +1,4 @@
-all: protogen
+all: protogen protogents
 
 protogen:
 	export CWD=$$(pwd) && \
@@ -10,3 +10,6 @@ protogen:
 		--print_structure \
 		--only_specified_files \
 		$${CWD}/*.proto
+
+protogents:
+	npm run gen-proto
