@@ -149,14 +149,13 @@ export class Cursor {
       err = e;
     }
 
+    this.ready = !err;
     if (err === NoDataError && this.cursorType === CursorType.WriteCursor) {
       this.ready = true;
       this.computedState = {};
       this._computedTimestamp = new Date(this.timestamp.getTime());
       err = null;
       this.lastState = null;
-    } else {
-      this.ready = !!err;
     }
     this.notReadyError = err;
 
@@ -357,7 +356,7 @@ export class Cursor {
           this.lastSnapshot = this.nextSnapshot;
           this.nextSnapshot = null;
           this.fillNextSnapshot();
-          if (this.nextSnapshot.timestamp.getTime() < this.timestamp.getTime()) {
+          if (!this.nextSnapshot || this.nextSnapshot.timestamp.getTime() < this.timestamp.getTime()) {
             this.lastSnapshot = null;
             this.nextSnapshot = null;
             this.fillLastSnapshot();
@@ -427,7 +426,7 @@ export class Cursor {
   private fillLastSnapshot() {
     let data = this.storage.getSnapshotBefore(this.timestamp);
     if (!data) {
-      return NoDataError;
+      throw NoDataError;
     }
     if (data.type !== StreamEntryType.StreamEntrySnapshot) {
       throw new Error('Storage backend didn\'t return a snapshot for getSnapshotBefore()');
@@ -460,7 +459,7 @@ export class Cursor {
 
     let snap = this.storage.getEntryAfter(this.lastSnapshot.timestamp, StreamEntryType.StreamEntrySnapshot);
     if (snap && snap.type !== StreamEntryType.StreamEntrySnapshot) {
-      return new Error('Storage backend returned the wrong entry type.');
+      throw new Error('Storage backend returned the wrong entry type.');
     }
     this.nextSnapshot = snap;
   }
