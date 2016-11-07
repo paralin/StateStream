@@ -22,6 +22,7 @@
     "semantic-release": "semantic-release pre && npm publish && semantic-release post"
   },
   "devDependencies": {
+    "@types/chai": "^3.4.34",
     "@types/es6-promise": "0.0.32",
     "@types/jasmine": "^2.5.36",
     "@types/protobufjs": "^5.0.31",
