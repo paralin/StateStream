@@ -1,0 +1,7 @@
+# npmignore
+ignore/
+coverage/
+jasmine.json
+tsconfig.json
+tslint.json
+src/

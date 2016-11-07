@@ -377,6 +377,7 @@ func (c *Cursor) fastForwardState() (err error) {
 	defer func() {
 		if err != nil {
 			c.computedState = nil
+			c.ready = false
 		} // else {
 		//	c.computedTimestamp = c.timestamp
 		//}
@@ -697,7 +698,6 @@ func (c *Cursor) ComputeState() (computeErr error) {
 		}
 	} else {
 		c.computedTimestamp = c.lastSnapshot.Timestamp
-		c.computedState = &StateDataPtr{StateData: c.lastSnapshot.Data}
 		err = c.copySnapshotState()
 		if err == nil {
 			err = c.fastForwardState()
