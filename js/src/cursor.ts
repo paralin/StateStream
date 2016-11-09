@@ -70,7 +70,7 @@ export class Cursor {
 
   // Initializes a cursor at a timestamp.
   // Timestamp should not be set for a write cursor.
-  public init(timestamp: Date = null) {
+  public async init(timestamp: Date = null) {
     if (this.inited) {
       throw new Error('Do not call init twice.');
     }
@@ -84,10 +84,10 @@ export class Cursor {
     } else {
       this.setTimestamp(timestamp);
     }
-    this.computeState();
+    await this.computeState();
   }
 
-  public initWithSnapshot(snap: StreamEntry) {
+  public async initWithSnapshot(snap: StreamEntry) {
     if (this.cursorType === CursorType.WriteCursor) {
       throw new Error('Cannot initialize write cursor with snapshot.');
     }
@@ -95,7 +95,7 @@ export class Cursor {
     this.timestamp = snap.timestamp;
     this.lastSnapshot = snap;
     this.copySnapshotState();
-    this.fillNextSnapshot();
+    await this.fillNextSnapshot();
   }
 
   public setRateConfig(config: IRateConfig) {
@@ -137,14 +137,14 @@ export class Cursor {
     }
   }
 
-  public computeState() {
+  public async computeState(): Promise<void> {
     if (this.ready) {
       return;
     }
 
     let err: any;
     try {
-      this.doComputeState();
+      await this.doComputeState();
     } catch (e) {
       err = e;
     }
@@ -170,7 +170,7 @@ export class Cursor {
   }
 
   // Handle a state entry on a writer (keeps it up to date)
-  public handleEntry(entry: StreamEntry) {
+  public async handleEntry(entry: StreamEntry): Promise<void> {
     // Assert we can handle a new entry
     this.canHandleNewEntry(entry.timestamp);
 
@@ -184,22 +184,22 @@ export class Cursor {
     this._streamEntries.next(entry);
   }
 
-  public writeEntry(entry: StreamEntry, config: IRateConfig) {
+  public async writeEntry(entry: StreamEntry, config: IRateConfig) {
     if (entry.type === StreamEntryType.StreamEntrySnapshot) {
-      this.writeState(entry.timestamp, entry.data, config);
+      await this.writeState(entry.timestamp, entry.data, config);
       return;
     }
 
     let newStateData = applyMutationObject(Clone(this.state), entry.data);
-    this.writeState(entry.timestamp, newStateData, config);
+    await this.writeState(entry.timestamp, newStateData, config);
   }
 
-  public writeState(timestamp: Date, state: StateData, config: IRateConfig) {
+  public async writeState(timestamp: Date, state: StateData, config: IRateConfig): Promise<void> {
     let savedEntry: StreamEntry;
     let err: any;
 
     try {
-      (() => {
+      await (async () => {
         if (this.lastState && DeepEqual(this.lastState, state)) {
           return;
         }
@@ -242,7 +242,7 @@ export class Cursor {
 
           // Calculate the new mutation
           amendedMutation.data = buildMutation(Clone(this.lastState), inputState);
-          this.storage.amendEntry(amendedMutation, this.lastMutation.timestamp);
+          await this.storage.amendEntry(amendedMutation, this.lastMutation.timestamp);
 
           this.computedState = inputState;
           this._computedTimestamp = timestamp;
@@ -261,7 +261,7 @@ export class Cursor {
           };
           savedEntry = snapshot;
 
-          this.storage.saveEntry(snapshot);
+          await this.storage.saveEntry(snapshot);
           this.lastSnapshot = snapshot;
           this.lastMutation = null;
           try {
@@ -337,10 +337,10 @@ export class Cursor {
     this._computedTimestamp = mutation.timestamp;
   }
 
-  private doComputeState() {
+  private async doComputeState() {
     if (!this.lastSnapshot) {
-      this.fillLastSnapshot();
-      this.fillNextSnapshot();
+      await this.fillLastSnapshot();
+      await this.fillNextSnapshot();
     }
 
     if (this.timestamp.getTime() === this.lastSnapshot.timestamp.getTime()) {
@@ -355,20 +355,20 @@ export class Cursor {
             this.nextSnapshot.timestamp.getTime() < this.timestamp.getTime()) {
           this.lastSnapshot = this.nextSnapshot;
           this.nextSnapshot = null;
-          this.fillNextSnapshot();
+          await this.fillNextSnapshot();
           if (!this.nextSnapshot || this.nextSnapshot.timestamp.getTime() < this.timestamp.getTime()) {
             this.lastSnapshot = null;
             this.nextSnapshot = null;
-            this.fillLastSnapshot();
-            this.fillNextSnapshot();
+            await this.fillLastSnapshot();
+            await this.fillNextSnapshot();
           }
         }
-        this.fastForwardState();
+        await this.fastForwardState();
       }
     } else {
       this._computedTimestamp = new Date(this.lastSnapshot.timestamp.getTime());
       this.copySnapshotState();
-      this.fastForwardState();
+      await this.fastForwardState();
     }
   }
 
@@ -382,10 +382,10 @@ export class Cursor {
     }
   }
 
-  private fastForwardState() {
+  private async fastForwardState() {
     try {
       while (this.computedTimestamp.getTime() < this.timestamp.getTime()) {
-        let entry = this.storage.getEntryAfter(this.computedTimestamp, StreamEntryType.StreamEntryAny);
+        let entry = await this.storage.getEntryAfter(this.computedTimestamp, StreamEntryType.StreamEntryAny);
         if (!entry) {
           break;
         }
@@ -405,7 +405,7 @@ export class Cursor {
           this.lastSnapshot = entry;
           this.nextSnapshot = null;
           this.copySnapshotState();
-          this.fillNextSnapshot();
+          await this.fillNextSnapshot();
         }
       }
     } catch (e) {
@@ -423,8 +423,8 @@ export class Cursor {
     this.lastMutations = [];
   }
 
-  private fillLastSnapshot() {
-    let data = this.storage.getSnapshotBefore(this.timestamp);
+  private async fillLastSnapshot() {
+    let data = await this.storage.getSnapshotBefore(this.timestamp);
     if (!data) {
       throw NoDataError;
     }
@@ -443,7 +443,7 @@ export class Cursor {
     this.computedState = null;
   }
 
-  private fillNextSnapshot() {
+  private async fillNextSnapshot() {
     if (!this.lastSnapshot) {
       return;
     }
@@ -457,7 +457,7 @@ export class Cursor {
       }
     }
 
-    let snap = this.storage.getEntryAfter(this.lastSnapshot.timestamp, StreamEntryType.StreamEntrySnapshot);
+    let snap = await this.storage.getEntryAfter(this.lastSnapshot.timestamp, StreamEntryType.StreamEntrySnapshot);
     if (snap && snap.type !== StreamEntryType.StreamEntrySnapshot) {
       throw new Error('Storage backend returned the wrong entry type.');
     }

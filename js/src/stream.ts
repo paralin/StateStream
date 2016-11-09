@@ -32,30 +32,33 @@ export class Stream {
     }
   }
 
-  public initWriter() {
+  public async initWriter() {
     if (this._writeCursor) {
       return;
     }
 
     let cursor = this.buildCursor(CursorType.WriteCursor);
-    cursor.init();
+    await cursor.init();
     this._writeCursor = cursor;
   }
 
-  public get writeCursor() {
-    if (!this._writeCursor) {
-      this.initWriter();
-    }
-    return this._writeCursor;
+  public get writeCursor(): Promise<Cursor> {
+    return (async () => {
+      if (!this._writeCursor) {
+        await this.initWriter();
+      }
+      return this._writeCursor;
+    })();
   }
 
-  public writeState(timestamp: Date, state: StateData) {
-    let cursor = this.writeCursor;
-    cursor.writeState(timestamp, state, this.config.record_rate);
+  public async writeState(timestamp: Date, state: StateData) {
+    let cursor = await this.writeCursor;
+    await cursor.writeState(timestamp, state, this.config.record_rate);
   }
 
-  public writeEntry(entry: StreamEntry) {
-    this.writeCursor.writeEntry(entry, this.config.record_rate);
+  public async writeEntry(entry: StreamEntry) {
+    let cursor = await this.writeCursor;
+    await cursor.writeEntry(entry, this.config.record_rate);
   }
 
   public buildCursor(cursorType: CursorType) {

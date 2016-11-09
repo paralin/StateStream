@@ -11,7 +11,7 @@ describe('Stream', () => {
     stream = new Stream(backend, null);
   });
 
-  it('should write correctly', () => {
-    stream.writeState(mockTime(0), {test: 5});
+  it('should write correctly', async () => {
+    await stream.writeState(mockTime(0), {test: 5});
   });
 });
