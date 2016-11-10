@@ -5,3 +5,4 @@ export * from './entry';
 export * from './errors';
 export * from './proto';
 export * from './stream';
+export * from './memory_backend';
