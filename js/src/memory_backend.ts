@@ -4,7 +4,7 @@ let binarySearch = require('binary-search');
 
 // An in-memory state stream backend.
 export class MemoryBackend implements IStorageBackend {
-  constructor(private entries: StreamEntry[] = []) {
+  constructor(public entries: StreamEntry[] = []) {
   }
 
   public getSnapshotBefore(time: Date): StreamEntry {
@@ -65,10 +65,18 @@ export class MemoryBackend implements IStorageBackend {
     this.entries[idx] = entry;
   }
 
+  public findClosestEntry(timestamp: Date) {
+    let idx = this.findClosest(timestamp);
+    if (idx < 0) {
+      return null;
+    }
+    return this.entries[idx];
+  }
+
   // Time: closest to this time.
   // If before, then before time. Otherwise, after.
   // Exact matching time is always returned if found.
-  private findClosest(time: Date): number {
+  public findClosest(time: Date): number {
     let timeNum: number = time.getTime();
     let idx: number =
       binarySearch(this.entries,
