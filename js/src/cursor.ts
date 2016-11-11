@@ -11,6 +11,7 @@ import {
 } from './config';
 import {
   Subject,
+  BehaviorSubject,
 } from 'rxjs';
 import {
   NoDataError,
@@ -55,6 +56,8 @@ export class Cursor {
   private rateConfig: IRateConfig;
   // For a feed-forward cursor, subscribe to a stream of entries when fast-forwarding
   private _streamEntries: Subject<StreamEntry>;
+  // Subject for computed state
+  private _nextComputedState = new BehaviorSubject<StateData>(null);
 
   // Create a new cursor
   constructor(private storage: IStorageBackend,
@@ -99,6 +102,7 @@ export class Cursor {
     this.lastSnapshot = snap;
     this.copySnapshotState();
     await this.fillNextSnapshot();
+    this._nextComputedState.next(this.computedState);
   }
 
   public setRateConfig(config: IRateConfig) {
@@ -111,6 +115,10 @@ export class Cursor {
       throw new Error('Computation is not ready.');
     }
     return this.computedState;
+  }
+
+  get nextState() {
+    return this._nextComputedState;
   }
 
   get computedTimestamp() {
@@ -165,6 +173,10 @@ export class Cursor {
     if (err) {
       throw err;
     }
+
+    if (this.ready && this._nextComputedState.value !== this.computedState) {
+      this._nextComputedState.next(this.computedState);
+    }
   }
 
   // Force a re-computation.
@@ -185,6 +197,7 @@ export class Cursor {
     }
 
     this._streamEntries.next(entry);
+    this._nextComputedState.next(this.computedState);
   }
 
   public async writeEntry(entry: StreamEntry, config: IRateConfig) {
