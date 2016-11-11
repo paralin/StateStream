@@ -1,6 +1,6 @@
 import { IStorageBackend } from './backend';
 import { StreamEntry, StreamEntryType } from './entry';
-let binarySearch = require('binary-search');
+import binarySearch = require('binary-search');
 
 // An in-memory state stream backend.
 export class MemoryBackend implements IStorageBackend {
