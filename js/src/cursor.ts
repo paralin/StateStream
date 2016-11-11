@@ -82,6 +82,9 @@ export class Cursor {
       this.ready = false;
       this.timestamp = new Date();
     } else {
+      if (!timestamp) {
+        timestamp = new Date();
+      }
       this.setTimestamp(timestamp);
     }
     await this.computeState();
