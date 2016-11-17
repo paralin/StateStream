@@ -34,7 +34,7 @@
     "istanbul": "^1.1.0-alpha.1",
     "jasmine": "^2.5.2",
     "jasmine-console-reporter": "^1.2.7",
-    "semantic-release": "^4.3.5",
+    "semantic-release": "^6.3.2",
     "ts-node": "^1.6.1",
     "tslint": "^3.14.0",
     "typescript": "~2.1.1"
