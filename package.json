@@ -36,7 +36,7 @@
     "jasmine-console-reporter": "^1.2.7",
     "semantic-release": "^6.3.2",
     "ts-node": "^1.6.1",
-    "tslint": "^3.14.0",
+    "tslint": "^4.0.1",
     "typescript": "~2.1.1"
   },
   "repository": {
