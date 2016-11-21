@@ -1,16 +1,11 @@
 node {
   stage ("node v6") {
-    sh '''
-      #!/bin/bash
-      set +x
-      source ~/.nvm/nvm.sh
-      nvm install 6
-    '''
+    sh 'init-node-ci 6'
   }
 
   stage ("scm") {
     checkout scm
-    sh './scripts/jenkins_setup_git.bash'
+    sh 'init-jenkins-node-scripts'
   }
 
   env.CACHE_CONTEXT='state-stream'
@@ -18,18 +13,18 @@ node {
     stage ("cache-download") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
-        ./scripts/init_cache.bash
+        source ./jenkins_scripts/jenkins_env.bash
+        ./jenkins_scripts/init_cache.bash
       '''
     }
 
     stage ("install") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
+        source ./jenkins_scripts/jenkins_env.bash
         enable-npm-proxy
-        npm install
-        npm prune
+        npm install -g yarn
+        yarn install
         ./scripts/jenkins_setup_deps.bash
       '''
     }
@@ -37,15 +32,15 @@ node {
     stage ("cache-upload") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
-        ./scripts/finalize_cache.bash
+        source ./jenkins_scripts/jenkins_env.bash
+        ./jenkins_scripts/finalize_cache.bash
       '''
     }
 
     stage ("test") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
+        source ./jenkins_scripts/jenkins_env.bash
         npm run ci
       '''
     }
@@ -53,7 +48,7 @@ node {
     stage ("gotest") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
+        source ./jenkins_scripts/jenkins_env.bash
         go test .
       '''
     }
@@ -61,8 +56,8 @@ node {
     stage ("release") {
       sh '''
         #!/bin/bash
-        source ./scripts/jenkins_env.bash
-        ./scripts/jenkins_release.bash
+        source ./jenkins_scripts/jenkins_env.bash
+        ./jenkins_scripts/jenkins_release.bash
       '''
     }
   }
