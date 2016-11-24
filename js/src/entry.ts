@@ -10,7 +10,7 @@ export type StreamEntry = {
   timestamp: Date;
   type: StreamEntryType;
   data: StateData;
-}
+};
 
 // Come up with a better way to do this.
 export function Clone(inp: any): any {
