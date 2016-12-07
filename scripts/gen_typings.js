@@ -65,13 +65,12 @@ function buildTypings(defs) {
       } else if (field.rule === "map") {
         typ = `{ [key: string]: ${typ} }`;
       }
-      result += "  " + fieldn + (["optional", "map", "repeated"].indexOf(field.rule) !== -1 ? "?" : "") + ": " + typ + ";\n";
+      result += "  " + fieldn + ([undefined, "map", "repeated"].indexOf(field.rule) !== -1 ? "?" : "") + ": " + typ + ";\n";
     }
-    result += "}\n";
+    result += "}\n\n";
   }
   // result += "}";
-  // delete last character
-  console.log(result.substring(0, result.length - 1));
+  console.log(result);
 }
 
 (function() {

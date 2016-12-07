@@ -4,23 +4,18 @@ import { IConfig, IRateConfig } from './proto/interfaces';
 
 import * as pbjs from 'protobufjs';
 
-const builder = pbjs.loadJson(JSON.stringify(PROTO_DEFINITIONS));
-
-export interface IProto<T> {
-  new(...args: any[]): T;
-  decode(data: any): T;
-}
+const builder = pbjs.Root.fromJSON(PROTO_DEFINITIONS);
 
 // tslint:disable-next-line
-export const Config: IProto<IConfig> = builder.build('stream.Config');
+export const Config: pbjs.Type = <any>builder.lookup('stream.Config');
 // tslint:disable-next-line
-export const RateConfig: IProto<IRateConfig> = builder.build('stream.RateConfig');
+export const RateConfig: pbjs.Type = <any>builder.lookup('stream.RateConfig');
 
 export function DefaultStreamConfig(): IConfig {
-  return new Config({
-    record_rate: {
-      keyframe_frequency: 60000,
-      change_frequency: 1000,
+  return {
+    recordRate: {
+      keyframeFrequency: 60000,
+      changeFrequency: 1000,
     },
-  });
+  };
 }

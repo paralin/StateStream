@@ -96,8 +96,8 @@ describe('Cursor', () => {
   it('should use a rate config optimization', async () => {
     let cursor = new Cursor(backend, CursorType.ReadForwardCursor);
     cursor.setRateConfig({
-      keyframe_frequency: 2000,
-      change_frequency: 500,
+      keyframeFrequency: 2000,
+      changeFrequency: 500,
     });
     await cursor.init(mockTime(-5));
     cursor.setTimestamp(mockTime(0));

@@ -1,7 +1,8 @@
 export interface IConfig {
-  record_rate?: IRateConfig;
+  recordRate?: IRateConfig;
 }
+
 export interface IRateConfig {
-  keyframe_frequency?: number;
-  change_frequency?: number;
+  keyframeFrequency?: number;
+  changeFrequency?: number;
 }

@@ -26,9 +26,9 @@ export class Stream {
   }
 
   public disableAmends() {
-    this.config.record_rate.change_frequency = 0;
+    this.config.recordRate.changeFrequency = 0;
     if (this._writeCursor) {
-      this._writeCursor.setRateConfig(this.config.record_rate);
+      this._writeCursor.setRateConfig(this.config.recordRate);
     }
   }
 
@@ -53,12 +53,12 @@ export class Stream {
 
   public async writeState(timestamp: Date, state: StateData) {
     let cursor = await this.writeCursor;
-    await cursor.writeState(timestamp, state, this.config.record_rate);
+    await cursor.writeState(timestamp, state, this.config.recordRate);
   }
 
   public async writeEntry(entry: StreamEntry) {
     let cursor = await this.writeCursor;
-    await cursor.writeEntry(entry, this.config.record_rate);
+    await cursor.writeEntry(entry, this.config.recordRate);
   }
 
   public buildCursor(cursorType: CursorType) {

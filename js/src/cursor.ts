@@ -241,7 +241,7 @@ export class Cursor {
 
         if (this.lastMutation &&
             (timestamp.getTime() - this.lastMutation.timestamp.getTime()) <
-            config.change_frequency) {
+            config.changeFrequency) {
           let amendedMutation: StreamEntry = {
             type: StreamEntryType.StreamEntryMutation,
             timestamp: this.lastMutation.timestamp,
@@ -269,7 +269,7 @@ export class Cursor {
         // Check if we should make a new snapshot
         if (!this.lastState ||
            (timestamp.getTime() - this.lastSnapshot.timestamp.getTime()) >=
-           config.keyframe_frequency) {
+           config.keyframeFrequency) {
           let snapshot: StreamEntry = {
             type: StreamEntryType.StreamEntrySnapshot,
             data: inputState,
@@ -466,7 +466,7 @@ export class Cursor {
 
     if (this.rateConfig) {
       let expectedNext = new Date(this.lastSnapshot.timestamp.getTime());
-      expectedNext.setMilliseconds(expectedNext.getMilliseconds() + this.rateConfig.keyframe_frequency);
+      expectedNext.setMilliseconds(expectedNext.getMilliseconds() + this.rateConfig.keyframeFrequency);
       if (expectedNext.getTime() > (new Date()).getTime()) {
         this.nextSnapshot = null;
         return;
