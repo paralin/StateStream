@@ -37,7 +37,7 @@
     "semantic-release": "^6.3.5",
     "ts-node": "^1.7.0",
     "tslint": "^4.0.2",
-    "typescript": "2.1.1"
+    "typescript": "2.1.4"
   },
   "repository": {
     "type": "git",
