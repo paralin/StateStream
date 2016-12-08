@@ -1,6 +1,6 @@
 {
   "name": "@fusebot/state-stream",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "js/lib/index.js",
   "typings": "js/lib/index.d.ts",
   "license": "UNLICENSED",
