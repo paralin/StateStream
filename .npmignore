@@ -4,3 +4,5 @@ Makefile
 Jenkinsfile
 scripts/
 coverage/
+IMPROVEMENTS.md
+yarn.lock
