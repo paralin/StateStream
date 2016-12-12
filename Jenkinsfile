@@ -14,7 +14,7 @@ node {
       sh '''
         #!/bin/bash
         source ./jenkins_scripts/jenkins_env.bash
-        ./jenkins_scripts/init_cache.bash
+        ./jenkins_scripts/init_cache.bash ./.yarn-cache/
       '''
     }
 
@@ -24,7 +24,7 @@ node {
         source ./jenkins_scripts/jenkins_env.bash
         enable-npm-proxy
         npm install -g yarn
-        yarn install
+        yarn install --cache-folder ./.yarn-cache/
         ./scripts/jenkins_setup_deps.bash
       '''
     }
@@ -33,7 +33,7 @@ node {
       sh '''
         #!/bin/bash
         source ./jenkins_scripts/jenkins_env.bash
-        ./jenkins_scripts/finalize_cache.bash
+        ./jenkins_scripts/finalize_cache.bash ./.yarn-cache/
       '''
     }
 

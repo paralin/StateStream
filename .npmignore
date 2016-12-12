@@ -6,3 +6,4 @@ scripts/
 coverage/
 IMPROVEMENTS.md
 yarn.lock
+.yarn-cache/
