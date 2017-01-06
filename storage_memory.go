@@ -10,6 +10,9 @@ import (
 type MemoryBackend struct {
 	Entries    []*StreamEntry
 	EntriesMtx sync.RWMutex
+
+	subscribers    []chan<- *StreamEntry
+	subscribersMtx sync.RWMutex
 }
 
 // Retrieve the first snapshot before timestamp. Return nil for no data.
@@ -93,6 +96,15 @@ func (mb *MemoryBackend) SaveEntry(entry *StreamEntry) error {
 	} else {
 		mb.Entries = append(mb.Entries, entry)
 	}
+
+	mb.subscribersMtx.RLock()
+	for _, sub := range mb.subscribers {
+		select {
+		case sub <- entry:
+		default:
+		}
+	}
+	mb.subscribersMtx.RUnlock()
 	return nil
 }
 
@@ -105,4 +117,15 @@ func (mb *MemoryBackend) AmendEntry(entry *StreamEntry, oldTimestamp time.Time) 
 
 	mb.Entries[idx] = entry
 	return nil
+}
+
+func (mb *MemoryBackend) EntryAdded(ch chan<- *StreamEntry) {
+	if ch == nil {
+		return
+	}
+
+	mb.subscribersMtx.Lock()
+	defer mb.subscribersMtx.Unlock()
+
+	mb.subscribers = append(mb.subscribers, ch)
 }

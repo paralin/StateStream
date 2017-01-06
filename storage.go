@@ -16,3 +16,7 @@ type StorageBackend interface {
 	// Amend an old entry
 	AmendEntry(entry *StreamEntry, oldTimestamp time.Time) error
 }
+
+type StreamingStorageBackend interface {
+	EntryAdded(chan<- *StreamEntry)
+}
