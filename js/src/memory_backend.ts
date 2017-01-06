@@ -74,7 +74,6 @@ export class MemoryBackend implements IStorageBackend {
   }
 
   // Time: closest to this time.
-  // If before, then before time. Otherwise, after.
   // Exact matching time is always returned if found.
   public findClosest(time: Date): number {
     let timeNum: number = time.getTime();
