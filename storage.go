@@ -15,6 +15,8 @@ type StorageBackend interface {
 	SaveEntry(entry *StreamEntry) error
 	// Amend an old entry
 	AmendEntry(entry *StreamEntry, oldTimestamp time.Time) error
+	// Iterate over all entries
+	ForEachEntry(func(entry *StreamEntry) error) error
 }
 
 type StreamingStorageBackend interface {

@@ -129,3 +129,15 @@ func (mb *MemoryBackend) EntryAdded(ch chan<- *StreamEntry) {
 
 	mb.subscribers = append(mb.subscribers, ch)
 }
+
+func (mb *MemoryBackend) ForEachEntry(cb func(entry *StreamEntry) error) error {
+	mb.EntriesMtx.RLock()
+	defer mb.EntriesMtx.RUnlock()
+
+	for _, ent := range mb.Entries {
+		if err := cb(ent); err != nil {
+			return err
+		}
+	}
+	return nil
+}
