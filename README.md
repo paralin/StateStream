@@ -1,6 +1,8 @@
 State Streams
 =============
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/FuseRobotics/StateStream.svg?token=73a5fdb966ffd331e53aad88281900ea29ceb15228e8de89ca390215f5ebc46d)](https://greenkeeper.io/)
+
 A state stream is a time series log of entries consisting of two types of entries:
 
  - Snapshot - a full snapshot of a state object
